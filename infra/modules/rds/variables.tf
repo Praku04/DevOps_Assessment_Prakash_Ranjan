@@ -8,8 +8,8 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "private_subnet_ids" {
-  description = "Private subnet IDs for the database subnet group."
+variable "subnet_ids" {
+  description = "Subnet IDs for the database subnet group."
   type        = list(string)
 }
 
@@ -43,25 +43,3 @@ variable "allocated_storage" {
   description = "Allocated storage in GB."
   type        = number
 }
-
-variable "backup_retention_period" {
-  description = "Backup retention period in days."
-  type        = number
-}
-
-variable "deletion_protection" {
-  description = "Whether deletion protection is enabled."
-  type        = bool
-}
-
-variable "multi_az" {
-  description = "Whether RDS should use Multi-AZ."
-  type        = bool
-}
-
-variable "tags" {
-  description = "Tags applied to resources."
-  type        = map(string)
-  default     = {}
-}
-

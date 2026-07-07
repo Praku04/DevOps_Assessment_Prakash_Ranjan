@@ -42,9 +42,3 @@ variable "desired_count" {
   description = "Number of ECS tasks."
   type        = number
 }
-
-variable "tags" {
-  description = "Tags applied to resources."
-  type        = map(string)
-  default     = {}
-}

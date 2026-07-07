@@ -1,4 +1,4 @@
-resource "aws_security_group" "rds" {
+resource "aws_security_group" "insurance_rds_security_group" {
   name        = "${var.name}-rds-sg"
   description = "Allow PostgreSQL only from ECS tasks"
   vpc_id      = var.vpc_id
@@ -18,21 +18,21 @@ resource "aws_security_group" "rds" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(var.tags, {
+  tags = {
     Name = "${var.name}-rds-sg"
-  })
+  }
 }
 
-resource "aws_db_subnet_group" "this" {
+resource "aws_db_subnet_group" "insurance_db_subnet_group" {
   name       = "${var.name}-db-subnet-group"
-  subnet_ids = var.private_subnet_ids
+  subnet_ids = var.subnet_ids
 
-  tags = merge(var.tags, {
+  tags = {
     Name = "${var.name}-db-subnet-group"
-  })
+  }
 }
 
-resource "aws_db_instance" "this" {
+resource "aws_db_instance" "insurance_database" {
   identifier             = "${var.name}-postgres"
   engine                 = "postgres"
   engine_version         = "16.3"
@@ -42,22 +42,17 @@ resource "aws_db_instance" "this" {
   db_name                = var.db_name
   username               = var.db_username
   password               = var.db_password
-  db_subnet_group_name   = aws_db_subnet_group.this.name
-  vpc_security_group_ids = [aws_security_group.rds.id]
+  db_subnet_group_name   = aws_db_subnet_group.insurance_db_subnet_group.name
+  vpc_security_group_ids = [aws_security_group.insurance_rds_security_group.id]
   publicly_accessible    = false
-  multi_az               = var.multi_az
 
-  backup_retention_period   = var.backup_retention_period
-  backup_window             = "03:00-04:00"
-  maintenance_window        = "sun:04:00-sun:05:00"
-  deletion_protection       = var.deletion_protection
-  skip_final_snapshot       = !var.deletion_protection
-  final_snapshot_identifier = var.deletion_protection ? "${var.name}-postgres-final" : null
+  backup_retention_period = 1
+  skip_final_snapshot     = true
 
   auto_minor_version_upgrade = true
   copy_tags_to_snapshot      = true
 
-  tags = merge(var.tags, {
+  tags = {
     Name = "${var.name}-postgres"
-  })
+  }
 }

@@ -1,114 +1,128 @@
-resource "aws_vpc" "this" {
+resource "aws_vpc" "insurance_vpc" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = merge(var.tags, {
+  tags = {
     Name = "${var.name}-vpc"
-  })
-}
-
-resource "aws_internet_gateway" "this" {
-  vpc_id = aws_vpc.this.id
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-igw"
-  })
-}
-
-resource "aws_subnet" "public" {
-  for_each = {
-    for idx, cidr in var.public_subnet_cidrs : idx => cidr
   }
+}
 
-  vpc_id                  = aws_vpc.this.id
-  cidr_block              = each.value
-  availability_zone       = var.availability_zones[tonumber(each.key)]
+resource "aws_internet_gateway" "insurance_internet_gateway" {
+  vpc_id = aws_vpc.insurance_vpc.id
+
+  tags = {
+    Name = "${var.name}-igw"
+  }
+}
+
+resource "aws_subnet" "insurance_public_subnet_1" {
+  vpc_id                  = aws_vpc.insurance_vpc.id
+  cidr_block              = var.public_subnet_cidrs[0]
+  availability_zone       = var.availability_zones[0]
   map_public_ip_on_launch = true
 
-  tags = merge(var.tags, {
-    Name = "${var.name}-public-${each.key}"
+  tags = {
+    Name = "${var.name}-public-subnet-1"
     Tier = "public"
-  })
-}
-
-resource "aws_subnet" "private" {
-  for_each = {
-    for idx, cidr in var.private_subnet_cidrs : idx => cidr
   }
-
-  vpc_id            = aws_vpc.this.id
-  cidr_block        = each.value
-  availability_zone = var.availability_zones[tonumber(each.key)]
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-private-${each.key}"
-    Tier = "private"
-  })
 }
 
-resource "aws_eip" "nat" {
-  for_each = aws_subnet.public
+resource "aws_subnet" "insurance_public_subnet_2" {
+  vpc_id                  = aws_vpc.insurance_vpc.id
+  cidr_block              = var.public_subnet_cidrs[1]
+  availability_zone       = var.availability_zones[1]
+  map_public_ip_on_launch = true
 
+  tags = {
+    Name = "${var.name}-public-subnet-2"
+    Tier = "public"
+  }
+}
+
+resource "aws_subnet" "insurance_private_subnet_1" {
+  vpc_id            = aws_vpc.insurance_vpc.id
+  cidr_block        = var.private_subnet_cidrs[0]
+  availability_zone = var.availability_zones[0]
+
+  tags = {
+    Name = "${var.name}-private-subnet-1"
+    Tier = "private"
+  }
+}
+
+resource "aws_subnet" "insurance_private_subnet_2" {
+  vpc_id            = aws_vpc.insurance_vpc.id
+  cidr_block        = var.private_subnet_cidrs[1]
+  availability_zone = var.availability_zones[1]
+
+  tags = {
+    Name = "${var.name}-private-subnet-2"
+    Tier = "private"
+  }
+}
+
+resource "aws_eip" "insurance_nat_eip" {
   domain = "vpc"
 
-  tags = merge(var.tags, {
-    Name = "${var.name}-nat-eip-${each.key}"
-  })
+  tags = {
+    Name = "${var.name}-nat-eip"
+  }
 }
 
-resource "aws_nat_gateway" "this" {
-  for_each = aws_subnet.public
+resource "aws_nat_gateway" "insurance_nat_gateway" {
+  allocation_id = aws_eip.insurance_nat_eip.id
+  subnet_id     = aws_subnet.insurance_public_subnet_1.id
 
-  allocation_id = aws_eip.nat[each.key].id
-  subnet_id     = each.value.id
+  tags = {
+    Name = "${var.name}-nat-gateway"
+  }
 
-  tags = merge(var.tags, {
-    Name = "${var.name}-nat-${each.key}"
-  })
-
-  depends_on = [aws_internet_gateway.this]
+  depends_on = [aws_internet_gateway.insurance_internet_gateway]
 }
 
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.this.id
+resource "aws_route_table" "insurance_public_route_table" {
+  vpc_id = aws_vpc.insurance_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.this.id
+    gateway_id = aws_internet_gateway.insurance_internet_gateway.id
   }
 
-  tags = merge(var.tags, {
+  tags = {
     Name = "${var.name}-public-rt"
-  })
+  }
 }
 
-resource "aws_route_table_association" "public" {
-  for_each = aws_subnet.public
-
-  subnet_id      = each.value.id
-  route_table_id = aws_route_table.public.id
+resource "aws_route_table_association" "insurance_public_route_table_association_1" {
+  subnet_id      = aws_subnet.insurance_public_subnet_1.id
+  route_table_id = aws_route_table.insurance_public_route_table.id
 }
 
-resource "aws_route_table" "private" {
-  for_each = aws_subnet.private
+resource "aws_route_table_association" "insurance_public_route_table_association_2" {
+  subnet_id      = aws_subnet.insurance_public_subnet_2.id
+  route_table_id = aws_route_table.insurance_public_route_table.id
+}
 
-  vpc_id = aws_vpc.this.id
+resource "aws_route_table" "insurance_private_route_table" {
+  vpc_id = aws_vpc.insurance_vpc.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this[each.key].id
+    nat_gateway_id = aws_nat_gateway.insurance_nat_gateway.id
   }
 
-  tags = merge(var.tags, {
-    Name = "${var.name}-private-rt-${each.key}"
-  })
+  tags = {
+    Name = "${var.name}-private-rt"
+  }
 }
 
-resource "aws_route_table_association" "private" {
-  for_each = aws_subnet.private
-
-  subnet_id      = each.value.id
-  route_table_id = aws_route_table.private[each.key].id
+resource "aws_route_table_association" "insurance_private_route_table_association_1" {
+  subnet_id      = aws_subnet.insurance_private_subnet_1.id
+  route_table_id = aws_route_table.insurance_private_route_table.id
 }
 
+resource "aws_route_table_association" "insurance_private_route_table_association_2" {
+  subnet_id      = aws_subnet.insurance_private_subnet_2.id
+  route_table_id = aws_route_table.insurance_private_route_table.id
+}

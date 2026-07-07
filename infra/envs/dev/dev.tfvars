@@ -10,8 +10,4 @@ ecs_memory                 = 512
 ecs_desired_count          = 1
 db_instance_class          = "db.t4g.micro"
 db_allocated_storage       = 20
-db_backup_retention_period = 1
-db_deletion_protection     = false
-db_multi_az                = false
 db_password                = "ChangeMeDevPassword123!"
-

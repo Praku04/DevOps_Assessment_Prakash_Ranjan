@@ -58,24 +58,8 @@ variable "db_allocated_storage" {
   description = "RDS allocated storage."
 }
 
-variable "db_backup_retention_period" {
-  type        = number
-  description = "RDS backup retention period."
-}
-
-variable "db_deletion_protection" {
-  type        = bool
-  description = "RDS deletion protection."
-}
-
-variable "db_multi_az" {
-  type        = bool
-  description = "RDS Multi-AZ setting."
-}
-
 variable "db_password" {
   type        = string
   description = "Demo database password. Use Secrets Manager for real deployments."
   sensitive   = true
 }
-

@@ -28,18 +28,19 @@ docker-compose.yml
 The infrastructure models:
 
 ```text
-Internet -> ALB -> ECS/Fargate -> private RDS PostgreSQL
+Internet -> ALB in public subnets -> ECS/Fargate in private subnets -> RDS PostgreSQL in private subnets
 ```
 
 Included resources:
 
 - VPC with public and private subnets
-- Internet gateway and NAT gateways
+- Internet gateway for public subnet internet access
+- NAT gateway for private subnet outbound internet access
 - ALB security group allowing HTTP from the internet
 - ECS/Fargate security group allowing traffic only from the ALB
 - RDS security group allowing PostgreSQL only from ECS/Fargate
 - ECS cluster, task definition, service, target group, listener, and ALB
-- Private RDS PostgreSQL instance in private subnets
+- RDS PostgreSQL instance in private subnets
 
 Environment differences:
 
@@ -49,9 +50,6 @@ Environment differences:
 | ECS desired count | 1 | 2 |
 | RDS instance | db.t4g.micro | db.t4g.small |
 | RDS storage | 20 GB | 50 GB |
-| Backup retention | 1 day | 7 days |
-| Deletion protection | false | true |
-| Multi-AZ | false | true |
 
 ### Validate Terraform
 
@@ -105,9 +103,9 @@ The database is exposed on `localhost:5432`.
 Default credentials:
 
 ```text
-database: hotel_db
-username: hotel_user
-password: hotel_pass
+database: insurance_db
+username: insurance_user
+password: insurance_pass
 ```
 
 Docker automatically runs:
@@ -119,8 +117,8 @@ Docker automatically runs:
 ### Verify Seed Data
 
 ```bash
-docker compose exec postgres psql -U hotel_user -d hotel_db -c "SELECT COUNT(*) FROM hotel_bookings;"
-docker compose exec postgres psql -U hotel_user -d hotel_db -c "SELECT COUNT(*) FROM booking_events;"
+docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM hotel_bookings;"
+docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM booking_events;"
 ```
 
 Expected result:
@@ -158,7 +156,7 @@ Why this index:
 Verify the plan:
 
 ```bash
-docker compose exec postgres psql -U hotel_user -d hotel_db -c "EXPLAIN ANALYZE SELECT org_id, status, COUNT(*), SUM(amount) FROM hotel_bookings WHERE city = 'delhi' AND created_at >= NOW() - INTERVAL '30 days' GROUP BY org_id, status;"
+docker compose exec postgres psql -U insurance_user -d insurance_db -c "EXPLAIN ANALYZE SELECT org_id, status, COUNT(*), SUM(amount) FROM hotel_bookings WHERE city = 'delhi' AND created_at >= NOW() - INTERVAL '30 days' GROUP BY org_id, status;"
 ```
 
 ## Backup and Restore
@@ -172,10 +170,10 @@ Create a timestamped dump:
 Backups are written to:
 
 ```text
-backups/hotel_db_YYYYMMDD_HHMMSS.dump
+backups/insurance_db_YYYYMMDD_HHMMSS.dump
 ```
 
-Restore the latest backup into a fresh local database named `hotel_db_restored`:
+Restore the latest backup into a fresh local database named `insurance_db_restored`:
 
 ```bash
 ./scripts/restore.sh
@@ -184,15 +182,15 @@ Restore the latest backup into a fresh local database named `hotel_db_restored`:
 Restore a specific dump:
 
 ```bash
-./scripts/restore.sh backups/hotel_db_YYYYMMDD_HHMMSS.dump
+./scripts/restore.sh backups/insurance_db_YYYYMMDD_HHMMSS.dump
 ```
 
 Verify restore:
 
 ```bash
-docker compose exec postgres psql -U hotel_user -d hotel_db_restored -c "SELECT COUNT(*) FROM hotel_bookings;"
-docker compose exec postgres psql -U hotel_user -d hotel_db_restored -c "SELECT COUNT(*) FROM booking_events;"
-docker compose exec postgres psql -U hotel_user -d hotel_db_restored -c "SELECT city, status, COUNT(*) FROM hotel_bookings GROUP BY city, status ORDER BY city, status;"
+docker compose exec postgres psql -U insurance_user -d insurance_db_restored -c "SELECT COUNT(*) FROM hotel_bookings;"
+docker compose exec postgres psql -U insurance_user -d insurance_db_restored -c "SELECT COUNT(*) FROM booking_events;"
+docker compose exec postgres psql -U insurance_user -d insurance_db_restored -c "SELECT city, status, COUNT(*) FROM hotel_bookings GROUP BY city, status ORDER BY city, status;"
 ```
 
 The counts should match the source database before restore.
@@ -210,4 +208,3 @@ Remove local database volume:
 ```bash
 docker compose down -v
 ```
-

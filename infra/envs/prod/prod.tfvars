@@ -10,8 +10,4 @@ ecs_memory                 = 1024
 ecs_desired_count          = 2
 db_instance_class          = "db.t4g.small"
 db_allocated_storage       = 50
-db_backup_retention_period = 7
-db_deletion_protection     = true
-db_multi_az                = true
 db_password                = "ChangeMeProdPassword123!"
-

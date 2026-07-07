@@ -2,8 +2,8 @@
 set -euo pipefail
 
 DB_CONTAINER="${DB_CONTAINER:-devops_assessment_postgres}"
-DB_USER="${DB_USER:-hotel_user}"
-RESTORE_DB="${RESTORE_DB:-hotel_db_restored}"
+DB_USER="${DB_USER:-insurance_user}"
+RESTORE_DB="${RESTORE_DB:-insurance_db_restored}"
 BACKUP_DIR="${BACKUP_DIR:-backups}"
 
 backup_file="${1:-}"
@@ -23,4 +23,3 @@ docker exec "${DB_CONTAINER}" psql -U "${DB_USER}" -d postgres -v ON_ERROR_STOP=
 docker exec -i "${DB_CONTAINER}" pg_restore -U "${DB_USER}" -d "${RESTORE_DB}" --clean --if-exists < "${backup_file}"
 
 echo "Restored ${backup_file} into database ${RESTORE_DB}"
-
