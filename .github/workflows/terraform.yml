@@ -1,0 +1,48 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform.yml"
+
+jobs:
+  terraform:
+    name: Terraform ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, prod]
+
+    defaults:
+      run:
+        working-directory: infra/envs/${{ matrix.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive ../../..
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -refresh=false -var-file=${{ matrix.environment }}.tfvars -out=${{ matrix.environment }}.tfplan
+
+      - name: Show plan
+        run: terraform show -no-color ${{ matrix.environment }}.tfplan > ${{ matrix.environment }}.plan.txt
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-${{ matrix.environment }}-plan
+          path: infra/envs/${{ matrix.environment }}/${{ matrix.environment }}.plan.txt
+
