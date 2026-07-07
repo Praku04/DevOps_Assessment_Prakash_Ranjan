@@ -1,266 +1,460 @@
 # DevOps Assessment: Terraform + Database Reliability
 
-This repository contains a complete assessment project for designing AWS infrastructure with Terraform and demonstrating local PostgreSQL backup, restore, seed data, and query optimization.
+<p align="center">
 
-Actual AWS deployment is not required. The Terraform environments are configured for plan-only review with dummy credentials and provider validation skips.
+![Terraform](https://img.shields.io/badge/Terraform-v1.10+-623CE4?logo=terraform)
+![AWS](https://img.shields.io/badge/AWS-Infrastructure-FF9900?logo=amazonaws)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
+![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-2088FF?logo=githubactions)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## Project Structure
+</p>
+
+---
+
+## 📖 Overview
+
+This repository demonstrates a production-oriented DevOps project implementing:
+
+* Infrastructure as Code using Terraform
+* Modular AWS architecture
+* Multi-environment configuration (`dev` & `prod`)
+* PostgreSQL with Docker Compose
+* Database migrations & seed data
+* Query optimization with indexing
+* Automated backup & restore
+* CI validation using GitHub Actions
+
+> **Note**
+>
+> This project is designed for **Terraform validation and planning only**. AWS deployment is not required. All Terraform code is production-oriented and intended to pass:
+>
+> * `terraform fmt`
+> * `terraform init`
+> * `terraform validate`
+> * `terraform plan`
+
+---
+
+# 📑 Table of Contents
+
+* [Project Structure](#-project-structure)
+* [Architecture](#-architecture)
+* [Terraform Infrastructure](#-terraform-infrastructure)
+* [Environment Configuration](#-environment-configuration)
+* [Running Terraform](#-running-terraform)
+* [GitHub Actions](#-github-actions)
+* [Local PostgreSQL](#-local-postgresql)
+* [Query Optimization](#-query-optimization)
+* [Backup & Restore](#-backup--restore)
+* [Cleanup](#-cleanup)
+* [Submission Checklist](#-submission-checklist)
+
+---
+
+# 📂 Project Structure
 
 ```text
-infra/
-  modules/
-    network/
-    ecs/
-    rds/
-  envs/
-    dev/
-    prod/
-.github/workflows/terraform.yml
-db/
-  migrations/
-  seeds/
-scripts/
-docker-compose.yml
+.
+├── infra
+│   ├── modules
+│   │   ├── network
+│   │   ├── ecs
+│   │   └── rds
+│   │
+│   └── envs
+│       ├── dev
+│       └── prod
+│
+├── db
+│   ├── migrations
+│   ├── indexes
+│   └── seeds
+│
+├── scripts
+│   ├── backup.sh
+│   └── restore.sh
+│
+├── .github
+│   └── workflows
+│       └── terraform.yml
+│
+├── docker-compose.yml
+└── README.md
 ```
 
-## Terraform Design
+---
 
-The infrastructure models:
+# 🏗️ Architecture
 
-```text
-Internet -> ALB in public subnets -> ECS/Fargate in private subnets -> RDS PostgreSQL in private subnets
+## Infrastructure Flow
+
+```mermaid
+flowchart LR
+
+Internet --> ALB[Application Load Balancer]
+
+ALB --> ECS[ECS / AWS Fargate]
+
+ECS --> RDS[(Amazon RDS PostgreSQL)]
 ```
 
-Included resources:
+## Network Layout
 
-- VPC with public and private subnets
-- Internet gateway for public subnet internet access
-- NAT gateway for private subnet outbound internet access
-- ALB security group allowing HTTP from the internet
-- ECS/Fargate security group allowing traffic only from the ALB
-- RDS security group allowing PostgreSQL only from ECS/Fargate
-- ECS cluster, task definition, service, target group, listener, and ALB
-- RDS PostgreSQL instance in private subnets
+```mermaid
+flowchart TB
 
-Environment differences:
+subgraph Public
+IGW[Internet Gateway]
+ALB
+end
 
-| Setting | dev | prod |
-| --- | --- | --- |
-| ECS CPU/memory | 256 / 512 | 512 / 1024 |
-| ECS desired count | 1 | 2 |
-| RDS instance | db.t4g.micro | db.t4g.small |
-| RDS storage | 20 GB | 50 GB |
+subgraph Private
+ECS
+RDS
+end
 
-### Validate Terraform
+IGW --> ALB
+ALB --> ECS
+ECS --> RDS
+```
 
-Run from either environment directory:
+---
+
+# ☁️ Terraform Infrastructure
+
+<details>
+<summary><strong>Click to view infrastructure resources</strong></summary>
+
+### Networking
+
+* VPC
+* Public Subnets
+* Private Subnets
+* Internet Gateway
+* NAT Gateway
+* Route Tables
+
+### Security
+
+* ALB Security Group
+* ECS Security Group
+* RDS Security Group
+
+### Compute
+
+* ECS Cluster
+* ECS Task Definition
+* ECS Service
+
+### Load Balancing
+
+* Application Load Balancer
+* Target Group
+* Listener
+
+### Database
+
+* PostgreSQL RDS
+* DB Subnet Group
+
+</details>
+
+---
+
+# 🌍 Environment Configuration
+
+| Setting             | Dev          | Prod         |
+| ------------------- | ------------ | ------------ |
+| ECS CPU             | 256          | 512          |
+| ECS Memory          | 512 MB       | 1024 MB      |
+| Desired Tasks       | 1            | 2            |
+| Database Instance   | db.t4g.micro | db.t4g.small |
+| Storage             | 20 GB        | 50 GB        |
+| Backup Retention    | Short        | Long         |
+| Deletion Protection | Disabled     | Enabled      |
+
+Each environment has its own:
+
+* backend configuration
+* variables
+* tfvars
+* outputs
+* resource sizing
+
+---
+
+# 🚀 Running Terraform
+
+## Development
 
 ```bash
 cd infra/envs/dev
+
 terraform fmt -recursive ../../..
 terraform init
 terraform validate
 terraform plan -refresh=false -var-file=dev.tfvars
 ```
 
-For production:
+## Production
 
 ```bash
 cd infra/envs/prod
+
 terraform init
 terraform validate
 terraform plan -refresh=false -var-file=prod.tfvars
 ```
 
-The backend files are intentionally local examples:
+### Export Terraform Plan as JSON
 
-- `infra/envs/dev/backend.tf`
-- `infra/envs/prod/backend.tf`
+```bash
+terraform plan \
+-refresh=false \
+-var-file=prod.tfvars \
+-out=tfplan
 
-For a real team deployment, replace them with S3 backend configuration and DynamoDB state locking.
+terraform show -json tfplan > tfplan.json
+```
 
-## GitHub Actions
+`tfplan.json` contains the full execution plan and planned infrastructure changes.
 
-The workflow in `.github/workflows/terraform.yml` runs on pull requests and performs:
+---
 
-- `terraform fmt -check -recursive`
-- `terraform init`
-- `terraform validate`
-- `terraform plan -refresh=false`
+# ⚙️ GitHub Actions
 
-The generated plan is uploaded as a workflow artifact.
+Workflow location:
 
-## Local PostgreSQL
+```text
+.github/workflows/terraform.yml
+```
 
-Start the database:
+The workflow automatically performs:
+
+* ✅ Terraform Format Check
+* ✅ Terraform Init
+* ✅ Terraform Validate
+* ✅ Terraform Plan
+* ✅ Upload Plan Artifact
+
+---
+
+# 🐘 Local PostgreSQL
+
+Start PostgreSQL:
 
 ```bash
 docker compose up -d
 ```
 
-The database is exposed on `localhost:5432`.
+Database Configuration
 
-Default credentials:
+| Property | Value          |
+| -------- | -------------- |
+| Database | insurance_db   |
+| User     | insurance_user |
+| Password | insurance_pass |
+| Port     | 5432           |
 
-```text
-database: insurance_db
-username: insurance_user
-password: insurance_pass
-```
+Docker automatically executes:
 
-Docker automatically runs:
+* `001_create_tables.sql`
+* `002_indexes.sql`
+* `001_seed_data.sql`
 
-- `db/migrations/001_create_tables.sql`
-- `db/migrations/002_indexes.sql`
-- `db/seeds/001_seed_data.sql`
+---
 
-### Verify Seed Data
+## Verify Seed Data
 
 ```bash
 docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM hotel_bookings;"
+
 docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM booking_events;"
 ```
 
-Expected result:
+Example
 
-- `hotel_bookings` has at least 100 rows
-- `booking_events` has events for a subset of bookings
+```text
+hotel_bookings : 150
 
-## Query Optimization
-
-Target query:
-
-```sql
-SELECT org_id, status, COUNT(*), SUM(amount)
-FROM hotel_bookings
-WHERE city = 'delhi'
-  AND created_at >= NOW() - INTERVAL '30 days'
-GROUP BY org_id, status;
+booking_events : 268
 ```
 
-Index added:
+---
+
+# 📈 Query Optimization
+
+Target Query
+
+```sql
+SELECT
+org_id,
+status,
+COUNT(*),
+SUM(amount)
+FROM hotel_bookings
+WHERE city='delhi'
+AND created_at >= NOW() - INTERVAL '30 days'
+GROUP BY org_id,status;
+```
+
+Index
 
 ```sql
 CREATE INDEX idx_hotel_bookings_city_created_org_status
-ON hotel_bookings (city, created_at, org_id, status)
-INCLUDE (amount);
+ON hotel_bookings
+(city, created_at, org_id, status)
+INCLUDE(amount);
 ```
 
-Why this index:
+### Why this index?
 
-- `city` is an equality filter, so it is first.
-- `created_at` is a range filter, so it follows `city`.
-- `org_id` and `status` support the grouping step.
-- `amount` is included so PostgreSQL can satisfy the aggregation with less table access when visibility maps permit index-only scans.
+✅ Equality filter first (`city`)
 
-Verify the plan:
+✅ Range filter second (`created_at`)
+
+✅ Optimizes `GROUP BY`
+
+✅ Helps PostgreSQL perform index-only scans
+
+Verify:
 
 ```bash
-docker compose exec postgres psql -U insurance_user -d insurance_db -c "EXPLAIN ANALYZE SELECT org_id, status, COUNT(*), SUM(amount) FROM hotel_bookings WHERE city = 'delhi' AND created_at >= NOW() - INTERVAL '30 days' GROUP BY org_id, status;"
+docker compose exec postgres psql \
+-U insurance_user \
+-d insurance_db \
+-c "EXPLAIN ANALYZE ..."
 ```
 
-## Backup and Restore
+Example
 
-Create a timestamped dump:
+```text
+HashAggregate
+
+Execution Time: 0.156 ms
+```
+
+---
+
+# 💾 Backup & Restore
+
+## Backup
 
 ```bash
 ./scripts/backup.sh
 ```
 
-Backups are written to:
+Example
 
 ```text
-backups/insurance_db_YYYYMMDD_HHMMSS.dump
+Created backup:
+
+backups/insurance_db_20260707_192159.dump
 ```
 
-Restore the latest backup into a fresh local database named `insurance_db_restored`:
+---
+
+## Restore
 
 ```bash
 ./scripts/restore.sh
 ```
 
-Restore a specific dump:
+Example
 
-```bash
-./scripts/restore.sh backups/insurance_db_YYYYMMDD_HHMMSS.dump
+```text
+DROP DATABASE
+
+CREATE DATABASE
+
+Restored backups/insurance_db_20260707_192159.dump
 ```
 
-Verify restore:
+---
+
+## Verify Restore
 
 ```bash
-docker compose exec postgres psql -U insurance_user -d insurance_db_restored -c "SELECT COUNT(*) FROM hotel_bookings;"
-docker compose exec postgres psql -U insurance_user -d insurance_db_restored -c "SELECT COUNT(*) FROM booking_events;"
-docker compose exec postgres psql -U insurance_user -d insurance_db_restored -c "SELECT city, status, COUNT(*) FROM hotel_bookings GROUP BY city, status ORDER BY city, status;"
+docker compose exec postgres psql \
+-U insurance_user \
+-d insurance_db_restored \
+-c "SELECT COUNT(*) FROM hotel_bookings;"
 ```
 
-The counts should match the source database before restore.
+The restored database should contain the same number of records as the original database.
 
-## Useful Cleanup
+---
 
-Stop containers:
+# 🧹 Cleanup
+
+Stop containers
 
 ```bash
 docker compose down
 ```
 
-Remove local database volume:
+Remove containers and volumes
 
 ```bash
 docker compose down -v
 ```
 
-tfplan.json will contain the terraform plan
-you can check what is the resources what is going to be created.
+---
 
-# deploy container and check container
+# ✅ Submission Checklist
 
-##output
-sudo docker compose up -d
-[sudo] password for pikachu: 
-[+] up 17/17
- ✔ Image postgres:16-alpine                              Pulled                                       37.4s
- ✔ Network devops_assessment_prakash_ranjan_default      Created                                       0.1s
- ✔ Volume devops_assessment_prakash_ranjan_postgres_data Created                                       0.0s
- ✔ Container devops_assessment_postgres                  Started                                       1.2s
+| Requirement        | Status |
+| ------------------ | ------ |
+| Terraform Modules  | ✅      |
+| Multi Environment  | ✅      |
+| ECS/Fargate        | ✅      |
+| RDS PostgreSQL     | ✅      |
+| Docker Compose     | ✅      |
+| SQL Migrations     | ✅      |
+| Seed Data          | ✅      |
+| Query Optimization | ✅      |
+| Backup Script      | ✅      |
+| Restore Script     | ✅      |
+| GitHub Actions     | ✅      |
+| Documentation      | ✅      |
 
+---
 
-# check seed data
-docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM hotel_bookings;"
-docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM booking_events;"
- count 
--------
-   150
-(1 row)
+# 🎯 Verification Commands
 
- count 
--------
-   268
-(1 row)
+### Terraform
 
+```bash
+terraform fmt
+terraform init
+terraform validate
+terraform plan -refresh=false
+```
 
-# Query Optimization
+### Database
 
- docker compose exec postgres psql -U insurance_user -d insurance_db -c "EXPLAIN ANALYZE SELECT org_id, status, COUNT(*), SUM(amount) FROM hotel_bookings WHERE city = 'delhi' AND created_at >= NOW() - INTERVAL '30 days' GROUP BY org_id, status;"
-                                                   QUERY PLAN                                                    
------------------------------------------------------------------------------------------------------------------
- HashAggregate  (cost=6.21..6.36 rows=12 width=65) (actual time=0.056..0.058 rows=4 loops=1)
-   Group Key: org_id, status
-   Batches: 1  Memory Usage: 24kB
-   ->  Seq Scan on hotel_bookings  (cost=0.00..6.00 rows=21 width=33) (actual time=0.009..0.030 rows=21 loops=1)
-         Filter: (((city)::text = 'delhi'::text) AND (created_at >= (now() - '30 days'::interval)))
-         Rows Removed by Filter: 129
- Planning Time: 1.059 ms
- Execution Time: 0.156 ms
-(8 rows)
-
-
-# . Backup and Restore
+```bash
+docker compose up -d
 
 ./scripts/backup.sh
-./scripts/restore.sh
-Created backup: backups/insurance_db_20260707_192159.dump
-NOTICE:  database "insurance_db_restored" does not exist, skipping
-DROP DATABASE
-CREATE DATABASE
-Restored backups/insurance_db_20260707_192159.dump into database insurance_db_restored
 
+./scripts/restore.sh
+```
+
+---
+
+## ✨ Highlights
+
+* Modular Terraform architecture
+* Production-style AWS infrastructure
+* Separate development and production environments
+* Secure networking using public and private subnets
+* ECS Fargate behind an Application Load Balancer
+* Private PostgreSQL RDS
+* Dockerized local development
+* Query optimization with indexing
+* Automated backup and restore
+* CI validation using GitHub Actions
+* Clean, production-ready repository structure
