@@ -29,13 +29,13 @@ module "ecs" {
 module "rds" {
   source = "../../modules/rds"
 
-  name                    = local.name
-  vpc_id                  = module.network.vpc_id
-  subnet_ids              = module.network.private_subnet_ids
-  ecs_security_group_id   = module.ecs.ecs_security_group_id
-  db_name                 = "insurance_db"
-  db_username             = "insurance_user"
-  db_password             = var.db_password
-  instance_class          = var.db_instance_class
-  allocated_storage       = var.db_allocated_storage
+  name                  = local.name
+  vpc_id                = module.network.vpc_id
+  subnet_ids            = module.network.private_subnet_ids
+  ecs_security_group_id = module.ecs.ecs_security_group_id
+  db_name               = "insurance_db"
+  db_username           = "insurance_user"
+  db_password           = var.db_password
+  instance_class        = var.db_instance_class
+  allocated_storage     = var.db_allocated_storage
 }

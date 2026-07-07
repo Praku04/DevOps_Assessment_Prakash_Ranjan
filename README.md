@@ -208,3 +208,59 @@ Remove local database volume:
 ```bash
 docker compose down -v
 ```
+
+tfplan.json will contain the terraform plan
+you can check what is the resources what is going to be created.
+
+# deploy container and check container
+
+##output
+sudo docker compose up -d
+[sudo] password for pikachu: 
+[+] up 17/17
+ ✔ Image postgres:16-alpine                              Pulled                                       37.4s
+ ✔ Network devops_assessment_prakash_ranjan_default      Created                                       0.1s
+ ✔ Volume devops_assessment_prakash_ranjan_postgres_data Created                                       0.0s
+ ✔ Container devops_assessment_postgres                  Started                                       1.2s
+
+
+# check seed data
+docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM hotel_bookings;"
+docker compose exec postgres psql -U insurance_user -d insurance_db -c "SELECT COUNT(*) FROM booking_events;"
+ count 
+-------
+   150
+(1 row)
+
+ count 
+-------
+   268
+(1 row)
+
+
+# Query Optimization
+
+ docker compose exec postgres psql -U insurance_user -d insurance_db -c "EXPLAIN ANALYZE SELECT org_id, status, COUNT(*), SUM(amount) FROM hotel_bookings WHERE city = 'delhi' AND created_at >= NOW() - INTERVAL '30 days' GROUP BY org_id, status;"
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=6.21..6.36 rows=12 width=65) (actual time=0.056..0.058 rows=4 loops=1)
+   Group Key: org_id, status
+   Batches: 1  Memory Usage: 24kB
+   ->  Seq Scan on hotel_bookings  (cost=0.00..6.00 rows=21 width=33) (actual time=0.009..0.030 rows=21 loops=1)
+         Filter: (((city)::text = 'delhi'::text) AND (created_at >= (now() - '30 days'::interval)))
+         Rows Removed by Filter: 129
+ Planning Time: 1.059 ms
+ Execution Time: 0.156 ms
+(8 rows)
+
+
+# . Backup and Restore
+
+./scripts/backup.sh
+./scripts/restore.sh
+Created backup: backups/insurance_db_20260707_192159.dump
+NOTICE:  database "insurance_db_restored" does not exist, skipping
+DROP DATABASE
+CREATE DATABASE
+Restored backups/insurance_db_20260707_192159.dump into database insurance_db_restored
+
